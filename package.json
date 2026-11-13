@@ -1,0 +1,134 @@
+{
+  "name": "@zodal/media",
+  "version": "0.1.0",
+  "description": "Headless audio and media UI affordances for zodal: timed text (transcripts, lyrics, subtitles) that follows the voice, a safe seek-and-play, a transport with a queue, and its commands.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./cues": {
+      "import": {
+        "types": "./dist/cues.d.ts",
+        "default": "./dist/cues.js"
+      },
+      "require": {
+        "types": "./dist/cues.d.cts",
+        "default": "./dist/cues.cjs"
+      }
+    },
+    "./playback": {
+      "import": {
+        "types": "./dist/playback.d.ts",
+        "default": "./dist/playback.js"
+      },
+      "require": {
+        "types": "./dist/playback.d.cts",
+        "default": "./dist/playback.cjs"
+      }
+    },
+    "./follow": {
+      "import": {
+        "types": "./dist/follow.d.ts",
+        "default": "./dist/follow.js"
+      },
+      "require": {
+        "types": "./dist/follow.d.cts",
+        "default": "./dist/follow.cjs"
+      }
+    },
+    "./timed-text": {
+      "import": {
+        "types": "./dist/timed-text.d.ts",
+        "default": "./dist/timed-text.js"
+      },
+      "require": {
+        "types": "./dist/timed-text.d.cts",
+        "default": "./dist/timed-text.cjs"
+      }
+    },
+    "./transport": {
+      "import": {
+        "types": "./dist/transport.d.ts",
+        "default": "./dist/transport.js"
+      },
+      "require": {
+        "types": "./dist/transport.d.cts",
+        "default": "./dist/transport.cjs"
+      }
+    },
+    "./commands": {
+      "import": {
+        "types": "./dist/commands.d.ts",
+        "default": "./dist/commands.js"
+      },
+      "require": {
+        "types": "./dist/commands.d.cts",
+        "default": "./dist/commands.cjs"
+      }
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "prepare": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zustand": "^5.0.3"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0",
+    "acture": ">=1.3.0 <2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    },
+    "acture": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "acture": "^1.3.1",
+    "jsdom": "^26.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "zod": "^4.0.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/i2mint/zodal-media.git"
+  },
+  "keywords": [
+    "zodal",
+    "media",
+    "audio",
+    "player",
+    "transcript",
+    "lyrics",
+    "subtitles",
+    "karaoke",
+    "headless"
+  ],
+  "packageManager": "pnpm@9.15.0"
+}
