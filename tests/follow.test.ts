@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { attachFollow, createFollow, scrollLineIntoContainer } from '../src/follow.js';
+import { attachFollow, createFollow, scrollLineIntoContainer, scrollerOf } from '../src/follow.js';
 
 describe('createFollow (headless)', () => {
   it('stops on a hand scroll and comes back only when asked, by default (a transcript)', () => {
@@ -102,7 +102,7 @@ describe('attachFollow (DOM)', () => {
     const { box } = panel();
     const follow = createFollow();
     attachFollow(box, follow, { scrollKeys: ['PageDown'] });
-    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'End' }));
     expect(follow.get().following).toBe(true);
     box.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown' }));
     expect(follow.get().following).toBe(false);
@@ -113,5 +113,54 @@ describe('attachFollow (DOM)', () => {
     attachFollow(document.documentElement, follow, { now: () => 1e12 });
     window.dispatchEvent(new Event('wheel'));
     expect(follow.get().following).toBe(false);
+  });
+
+  it('leaves Space, arrows, text fields and handled keys alone by default', () => {
+    const { box } = panel();
+    const follow = createFollow();
+    attachFollow(box, follow);
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    const field = document.createElement('input');
+    box.appendChild(field);
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown', bubbles: true }));
+    expect(follow.get().following).toBe(true);
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown' }));
+    expect(follow.get().following).toBe(false);
+  });
+
+  it('places the line in the view left below a sticky bar (scroll-margin)', () => {
+    const { box, lines } = panel();
+    Object.defineProperty(box, 'clientHeight', { value: 300 });
+    box.getBoundingClientRect = () => ({ top: 0, height: 300 }) as DOMRect;
+    lines[10].getBoundingClientRect = () => ({ top: 500, height: 20 }) as DOMRect;
+    lines[10].style.scrollMarginTop = '100px';
+    box.scrollTo = vi.fn();
+    scrollLineIntoContainer(box, lines[10], { anchor: 0.5, smooth: false });
+    // view: 100..300 (height 200); 0 + (500 - 100) - (100 - 10) = 310
+    expect(box.scrollTo).toHaveBeenCalledWith({ top: 310, behavior: 'auto' });
+  });
+
+  it('finds the nearest scrolling ancestor, else the page', () => {
+    const { box, lines } = panel();
+    expect(scrollerOf(lines[0])).toBe(document.documentElement);
+    box.style.overflowY = 'auto';
+    Object.defineProperty(box, 'scrollHeight', { value: 1000 });
+    Object.defineProperty(box, 'clientHeight', { value: 100 });
+    expect(scrollerOf(lines[0])).toBe(box);
+  });
+
+  it('detaching does not stop a follow it did not create', () => {
+    vi.useFakeTimers();
+    try {
+      const { box } = panel();
+      const follow = createFollow({ resumeAfterMs: 100 });
+      follow.handMoved();
+      attachFollow(box, follow).detach();
+      vi.advanceTimersByTime(100);
+      expect(follow.get().following).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

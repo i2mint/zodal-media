@@ -121,7 +121,11 @@ export function createMediaPlayer(port: MediaPort, options: MediaPlayerOptions =
       sync();
     },
     pause() { held?.abort(); port.pause(); sync(); },
-    async toggle() { if (port.paused) await player.play(); else player.pause(); },
+    async toggle() {
+      if (held) player.pause(); // a play waiting for its seek: the tap means pause
+      else if (port.paused) await player.play();
+      else player.pause();
+    },
     seekTo(seconds) {
       const max = port.duration || Infinity;
       soughtAfterEnd = soughtAfterEnd || !!port.ended;

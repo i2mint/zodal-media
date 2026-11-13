@@ -22,8 +22,7 @@ export interface FollowOptions {
   following?: boolean;
   /** Resume by itself this long after the hand is still; `null` never (a "Back to now" only). */
   resumeAfterMs?: number | null;
-  /** The clock and the timer, for tests. */
-  now?: () => number;
+  /** The timer, for tests. */
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
 }
@@ -104,11 +103,14 @@ export function createFollow(options: FollowOptions = {}): Follow {
 /** True when `el` is the page's own scroller (its scroll events reach the window, its view is the window). */
 function isPageScroller(el: HTMLElement): boolean {
   const doc = el.ownerDocument;
-  return el === doc.scrollingElement || el === doc.documentElement || el === doc.body;
+  return el === doc.scrollingElement || el === doc.documentElement;
 }
 
-/** Keys that scroll a list, so pressing them is a person scrolling. */
-export const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '] as const;
+/**
+ * Keys that mean a person is scrolling the list. Space and the arrows are left out: a player binds
+ * them to play and seek, and a key pressed in a text field is never counted.
+ */
+export const SCROLL_KEYS = ['PageUp', 'PageDown', 'Home', 'End'] as const;
 
 /**
  * Scrolls `container` so `line` sits at `anchor` (0 top, 0.5 middle) of its visible height.
@@ -119,17 +121,35 @@ export function scrollLineIntoContainer(
   line: HTMLElement,
   { anchor = 0.5, smooth = true }: { anchor?: number; smooth?: boolean } = {},
 ): void {
+  const win = container.ownerDocument.defaultView;
   const box = container.getBoundingClientRect();
   const at = line.getBoundingClientRect();
   // The page's own scroller reports its box as the whole document; its view is the window.
   const isPage = isPageScroller(container);
-  const viewTop = isPage ? 0 : box.top;
-  const viewHeight = isPage ? container.ownerDocument.defaultView?.innerHeight ?? box.height : container.clientHeight;
+  // The line's scroll margins (a sticky bar's height) shrink the view it is placed in, as they
+  // do for scrollIntoView.
+  const style = win?.getComputedStyle?.(line);
+  const marginTop = parseFloat(style?.scrollMarginTop ?? '') || 0;
+  const marginBottom = parseFloat(style?.scrollMarginBottom ?? '') || 0;
+  const viewTop = (isPage ? 0 : box.top + container.clientTop) + marginTop;
+  const fullHeight = isPage ? win?.innerHeight ?? box.height : container.clientHeight;
+  const viewHeight = Math.max(0, fullHeight - marginTop - marginBottom);
   const top = container.scrollTop + (at.top - viewTop) - (viewHeight * anchor - at.height / 2);
-  const calm = container.ownerDocument.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const calm = win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const behavior: ScrollBehavior = smooth && !calm ? 'smooth' : 'auto';
   if (typeof container.scrollTo === 'function') container.scrollTo({ top: Math.max(0, top), behavior });
   else container.scrollTop = Math.max(0, top);
+}
+
+/** The nearest ancestor of `el` that scrolls vertically, or the page's scroller. */
+export function scrollerOf(el: HTMLElement): HTMLElement {
+  const doc = el.ownerDocument;
+  const page = (doc.scrollingElement ?? doc.documentElement) as HTMLElement;
+  for (let node = el.parentElement; node && node !== doc.body && node !== doc.documentElement; node = node.parentElement) {
+    const overflow = doc.defaultView?.getComputedStyle(node).overflowY ?? '';
+    if ((overflow === 'auto' || overflow === 'scroll' || overflow === 'overlay') && node.scrollHeight > node.clientHeight) return node;
+  }
+  return page;
 }
 
 export interface AttachFollowOptions {
@@ -174,7 +194,9 @@ export function attachFollow(container: HTMLElement, follow: Follow, options: At
   on('touchend', () => follow.fingerUp());
   on('touchcancel', () => follow.fingerUp());
   on('keydown', (e) => {
-    if (scrollKeys.includes((e as KeyboardEvent).key)) follow.handMoved();
+    const t = e.target as HTMLElement | null;
+    const editable = !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    if (!e.defaultPrevented && !editable && scrollKeys.includes((e as KeyboardEvent).key)) follow.handMoved();
   });
   return {
     bring(line, force = false) {
@@ -184,7 +206,6 @@ export function attachFollow(container: HTMLElement, follow: Follow, options: At
     },
     detach() {
       offs.forEach((off) => off());
-      follow.dispose();
     },
   };
 }

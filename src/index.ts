@@ -8,10 +8,10 @@
  * - `./transport`: a headless player with a queue over any `MediaPort`.
  * - `./commands`: the transport's actions as acture commands (needs `acture` and `zod`).
  *
- * The root re-exports everything except `./commands`, so it needs neither acture nor zod.
+ * The root re-exports the pure parts (cues, playback, follow, timed text): no zustand, acture or
+ * zod. Import the transport and the commands from their subpaths.
  */
 export * from './cues.js';
 export * from './playback.js';
 export * from './follow.js';
 export * from './timed-text.js';
-export * from './transport.js';

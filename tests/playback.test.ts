@@ -142,3 +142,28 @@ describe('the media player', () => {
     expect(el.play).not.toHaveBeenCalled();
   });
 });
+
+describe('the transport toggle while a play waits for its seek', () => {
+  it('means pause', async () => {
+    const el = webkitLike();
+    const player = createMediaPlayer(el as unknown as MediaPort);
+    player.seekTo(4);
+    const playing = player.play();
+    await player.toggle();
+    el.land();
+    await playing;
+    expect(el.play).not.toHaveBeenCalled();
+  });
+});
+
+describe('a timed text disposed while its play waits', () => {
+  it('never plays', async () => {
+    const el = webkitLike();
+    const text = createTimedText([{ start: 0, end: 9 }, { start: 4, end: 9 }], el);
+    text.tapCue(1);
+    text.dispose();
+    el.land();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(el.play).not.toHaveBeenCalled();
+  });
+});

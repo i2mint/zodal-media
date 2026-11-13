@@ -3,8 +3,8 @@
 Headless audio and media UI affordances for the zodal ecosystem: timed text (a transcript, song lyrics, subtitles) that follows the voice and plays from a tapped line, a seek-and-play that works on every engine, and a transport with a queue whose actions are commands.
 
 ```bash
-pnpm add @zodal/media zustand
-# for ./commands only: pnpm add acture zod
+pnpm add @zodal/media
+# ./transport also needs zustand; ./commands also needs acture and zod
 ```
 
 ## A transcript or lyrics panel in a few lines
@@ -43,7 +43,7 @@ A transcript plays from a tapped line (the default). A lyrics panel whose player
 | `./transport` | `createMediaPlayer(port)`: a zustand store with play, pause, seek, skip, rate, volume and a queue, over any `MediaPort`. |
 | `./commands` | `mediaCommands(player)`: the transport's actions as [acture](https://www.npmjs.com/package/acture) commands, continuous ones marked. |
 
-The root export is everything except `./commands`, so it needs neither acture nor zod.
+The root export is the pure part (cues, playback, follow, timed text), with no dependency at all; the transport and its commands come from their subpaths.
 
 ## The trap it closes: tapping a line after the end
 
