@@ -27,6 +27,16 @@
         "default": "./dist/cues.cjs"
       }
     },
+    "./vtt": {
+      "import": {
+        "types": "./dist/vtt.d.ts",
+        "default": "./dist/vtt.js"
+      },
+      "require": {
+        "types": "./dist/vtt.d.cts",
+        "default": "./dist/vtt.cjs"
+      }
+    },
     "./playback": {
       "import": {
         "types": "./dist/playback.d.ts",

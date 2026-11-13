@@ -1,6 +1,6 @@
 import { defineConfig } from 'tsup';
 
-const entries = ['index', 'cues', 'playback', 'follow', 'timed-text', 'transport', 'commands'];
+const entries = ['index', 'cues', 'vtt', 'playback', 'follow', 'timed-text', 'transport', 'commands'];
 
 export default defineConfig({
   entry: Object.fromEntries(entries.map((e) => [e, `src/${e}.ts`])),
