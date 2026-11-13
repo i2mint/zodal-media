@@ -38,6 +38,8 @@ export interface TimedText {
   tapCue(index: number): void;
   /** Cancel a play waiting for its seek (a pause tapped meanwhile). True if there was one. */
   cancelHeldPlay(): boolean;
+  /** The view went away: cancel a held play and forget the listeners. */
+  dispose(): void;
 }
 
 export function createTimedText(cues: readonly CueLike[], port: TimedTextPort, options: TimedTextOptions = {}): TimedText {
@@ -87,5 +89,9 @@ export function createTimedText(cues: readonly CueLike[], port: TimedTextPort, o
       tick();
     },
     cancelHeldPlay,
+    dispose() {
+      cancelHeldPlay();
+      listeners.clear();
+    },
   };
 }
