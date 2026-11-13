@@ -131,6 +131,8 @@ export interface AttachFollowOptions {
   anchor?: number;
   /** How long the list's own smooth scroll is not mistaken for a person's. */
   ownScrollMs?: number;
+  /** Keys that mean a person is scrolling; leave out keys the host uses (arrows that seek). */
+  scrollKeys?: readonly string[];
   now?: () => number;
 }
 
@@ -148,7 +150,7 @@ export interface AttachedFollow {
  * hand listeners then go on the window, since a page's scroll events reach it there.
  */
 export function attachFollow(container: HTMLElement, follow: Follow, options: AttachFollowOptions = {}): AttachedFollow {
-  const { anchor = 0.5, ownScrollMs = DEFAULT_OWN_SCROLL_MS, now = () => Date.now() } = options;
+  const { anchor = 0.5, ownScrollMs = DEFAULT_OWN_SCROLL_MS, scrollKeys = SCROLL_KEYS, now = () => Date.now() } = options;
   const doc = container.ownerDocument;
   const target: EventTarget = container === doc.scrollingElement ? doc.defaultView ?? container : container;
   let ownUntil = 0;
@@ -166,7 +168,7 @@ export function attachFollow(container: HTMLElement, follow: Follow, options: At
   on('touchend', () => follow.fingerUp());
   on('touchcancel', () => follow.fingerUp());
   on('keydown', (e) => {
-    if ((SCROLL_KEYS as readonly string[]).includes((e as KeyboardEvent).key)) follow.handMoved();
+    if (scrollKeys.includes((e as KeyboardEvent).key)) follow.handMoved();
   });
   return {
     bring(line, force = false) {

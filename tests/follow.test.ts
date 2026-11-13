@@ -97,4 +97,14 @@ describe('attachFollow (DOM)', () => {
     // 50 + (500 - 100) - (200 * 0.35 - 10) = 390
     expect(box.scrollTo).toHaveBeenCalledWith({ top: 390, behavior: 'auto' });
   });
+
+  it('counts only the scroll keys it is given', () => {
+    const { box } = panel();
+    const follow = createFollow();
+    attachFollow(box, follow, { scrollKeys: ['PageDown'] });
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    expect(follow.get().following).toBe(true);
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown' }));
+    expect(follow.get().following).toBe(false);
+  });
 });
