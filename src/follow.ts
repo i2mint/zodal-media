@@ -101,6 +101,12 @@ export function createFollow(options: FollowOptions = {}): Follow {
   };
 }
 
+/** True when `el` is the page's own scroller (its scroll events reach the window, its view is the window). */
+function isPageScroller(el: HTMLElement): boolean {
+  const doc = el.ownerDocument;
+  return el === doc.scrollingElement || el === doc.documentElement || el === doc.body;
+}
+
 /** Keys that scroll a list, so pressing them is a person scrolling. */
 export const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '] as const;
 
@@ -116,7 +122,7 @@ export function scrollLineIntoContainer(
   const box = container.getBoundingClientRect();
   const at = line.getBoundingClientRect();
   // The page's own scroller reports its box as the whole document; its view is the window.
-  const isPage = container === container.ownerDocument.scrollingElement;
+  const isPage = isPageScroller(container);
   const viewTop = isPage ? 0 : box.top;
   const viewHeight = isPage ? container.ownerDocument.defaultView?.innerHeight ?? box.height : container.clientHeight;
   const top = container.scrollTop + (at.top - viewTop) - (viewHeight * anchor - at.height / 2);
@@ -152,7 +158,7 @@ export interface AttachedFollow {
 export function attachFollow(container: HTMLElement, follow: Follow, options: AttachFollowOptions = {}): AttachedFollow {
   const { anchor = 0.5, ownScrollMs = DEFAULT_OWN_SCROLL_MS, scrollKeys = SCROLL_KEYS, now = () => Date.now() } = options;
   const doc = container.ownerDocument;
-  const target: EventTarget = container === doc.scrollingElement ? doc.defaultView ?? container : container;
+  const target: EventTarget = isPageScroller(container) ? doc.defaultView ?? container : container;
   let ownUntil = 0;
   const offs: Array<() => void> = [];
   const on = (type: string, fn: (e: Event) => void) => {

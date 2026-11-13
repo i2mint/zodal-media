@@ -107,4 +107,11 @@ describe('attachFollow (DOM)', () => {
     box.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown' }));
     expect(follow.get().following).toBe(false);
   });
+
+  it('hears the window when the page itself is the scroller', () => {
+    const follow = createFollow();
+    attachFollow(document.documentElement, follow, { now: () => 1e12 });
+    window.dispatchEvent(new Event('wheel'));
+    expect(follow.get().following).toBe(false);
+  });
 });
