@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import { defineCommand, ok, err, type AnyCommandRecord } from 'acture';
 import type { MediaItem, MediaPlayer } from './transport.js';
+import type { SleepTimer } from './sleep.js';
 
 /** Commands that carry a target value and are safe at 60 Hz; history and undo should skip them. */
 export const CONTINUOUS_COMMAND_IDS = ['media.seekTo', 'media.setRate', 'media.setVolume'] as const;
@@ -48,5 +49,29 @@ export function mediaCommands(player: MediaPlayer): AnyCommandRecord[] {
         player.enqueue(p.item, { next: p.next });
         return done();
       } }),
+  ];
+}
+
+/**
+ * A sleep timer's actions as acture commands (`./sleep`). `sleep.at` takes a media time, so a host
+ * that knows its chapters registers its own "end of chapter" command on top of it.
+ */
+export function sleepCommands(timer: SleepTimer): AnyCommandRecord[] {
+  const cat = 'media.sleep';
+  const done = () => ok(undefined);
+  return [
+    defineCommand({ id: 'sleep.after', title: 'Sleep after minutes', category: cat,
+      params: z.object({ minutes: z.number().positive() }),
+      execute: (p: { minutes: number }) => { timer.set({ kind: 'after', minutes: p.minutes }); return done(); } }),
+    defineCommand({ id: 'sleep.at', title: 'Sleep at a point in the item', category: cat,
+      params: z.object({ seconds: z.number().min(0), label: z.string().optional() }),
+      execute: (p: { seconds: number; label?: string }) => { timer.set({ kind: 'at', ...p }); return done(); } }),
+    defineCommand({ id: 'sleep.end', title: 'Sleep at the end of the item', category: cat,
+      execute: () => { timer.set({ kind: 'end' }); return done(); } }),
+    defineCommand({ id: 'sleep.extend', title: 'Add minutes to the sleep timer', category: cat,
+      params: z.object({ minutes: z.number().positive() }),
+      execute: (p: { minutes: number }) => { timer.extend(p.minutes); return done(); } }),
+    defineCommand({ id: 'sleep.cancel', title: 'Turn the sleep timer off', category: cat,
+      execute: () => { timer.cancel(); return done(); } }),
   ];
 }
