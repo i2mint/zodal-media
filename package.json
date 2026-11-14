@@ -67,6 +67,16 @@
         "default": "./dist/timed-text.cjs"
       }
     },
+    "./sleep": {
+      "import": {
+        "types": "./dist/sleep.d.ts",
+        "default": "./dist/sleep.js"
+      },
+      "require": {
+        "types": "./dist/sleep.d.cts",
+        "default": "./dist/sleep.cjs"
+      }
+    },
     "./transport": {
       "import": {
         "types": "./dist/transport.d.ts",
@@ -140,7 +150,8 @@
     "lyrics",
     "subtitles",
     "karaoke",
-    "headless"
+    "headless",
+    "sleep-timer"
   ],
   "packageManager": "pnpm@9.15.0"
 }

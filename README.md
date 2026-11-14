@@ -41,10 +41,25 @@ A transcript plays from a tapped line (the default). A lyrics panel whose player
 | `./playback` | `seekThenPlay(el, t)` and `seekLanded(el)`: play from a chosen point, safely on Safari too (below). |
 | `./follow` | `createFollow` (headless: following, finger-down hold, optional auto-resume) and `attachFollow` (one scroll container, never `scrollIntoView`). |
 | `./timed-text` | `createTimedText(cues, port, options)`: the current cue and word, `tapCue`, `cancelHeldPlay`. |
+| `./sleep` | `createSleepTimer(port)`: pause after listening minutes, at a media time or at the end, with a fade; `formatCountdown`, `SLEEP_MINUTES`. |
 | `./transport` | `createMediaPlayer(port)`: a zustand store with play, pause, seek, skip, rate, volume and a queue, over any `MediaPort`. |
 | `./commands` | `mediaCommands(player)`: the transport's actions as [acture](https://www.npmjs.com/package/acture) commands, continuous ones marked. |
 
 The root export is the pure part (cues, vtt, playback, follow, timed text), with no dependency at all; the transport and its commands come from their subpaths.
+
+## A sleep timer
+
+```ts
+import { createSleepTimer, formatCountdown } from '@zodal/media';
+
+const sleep = createSleepTimer(audio);              // listens to `timeupdate` itself
+sleep.set({ kind: 'after', minutes: 15 });          // 15 minutes of listening (a pause stops the count)
+sleep.set({ kind: 'at', seconds: 1260, label: 'end of chapter' });
+sleep.set({ kind: 'end' });                          // the end of the item
+sleep.subscribe((s) => chip.textContent = s.remainingMs == null ? 'Sleep' : formatCountdown(s.remainingMs));
+```
+
+It fades the volume over the last 10 s (`fadeMs`) and restores it after the pause, a cancel or an `extend(minutes)`. A seek past an `at` point ends the timer (`ended: 'passed'`) rather than pausing at once. `sleepCommands(timer)` in `./commands` gives `sleep.after`, `sleep.at`, `sleep.end`, `sleep.extend` and `sleep.cancel`.
 
 ## The trap it closes: tapping a line after the end
 
