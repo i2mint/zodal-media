@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { defineCommand, ok, err, type AnyCommandRecord } from 'acture';
 import type { MediaItem, MediaPlayer } from './transport.js';
 import type { SleepTimer } from './sleep.js';
+import { END_MODES, END_MODE_INFO, nextEndMode, type EndMode } from './end-mode.js';
 
 /** Commands that carry a target value and are safe at 60 Hz; history and undo should skip them. */
 export const CONTINUOUS_COMMAND_IDS = ['media.seekTo', 'media.setRate', 'media.setVolume'] as const;
@@ -73,5 +74,20 @@ export function sleepCommands(timer: SleepTimer): AnyCommandRecord[] {
       execute: (p: { minutes: number }) => { timer.extend(p.minutes); return done(); } }),
     defineCommand({ id: 'sleep.cancel', title: 'Turn the sleep timer off', category: cat,
       execute: () => { timer.cancel(); return done(); } }),
+  ];
+}
+
+/**
+ * The end-of-item mode's actions as acture commands (`./end-mode`). The host owns where the mode
+ * lives (a persisted preference); these read and write it through `get` and `set`.
+ */
+export function endModeCommands({ get, set }: { get: () => EndMode; set: (mode: EndMode) => void }): AnyCommandRecord[] {
+  const cat = 'media';
+  return [
+    defineCommand({ id: 'end.setMode', title: 'When an item ends: stop, repeat it, play the list in order, repeat the list or shuffle it', category: cat,
+      params: z.object({ mode: z.enum(END_MODES) }),
+      execute: (p: { mode: EndMode }) => { set(p.mode); return ok(END_MODE_INFO[p.mode].label); } }),
+    defineCommand({ id: 'end.cycle', title: 'Step to the next end-of-item mode', category: cat,
+      execute: () => { const mode = nextEndMode(get()); set(mode); return ok(END_MODE_INFO[mode].label); } }),
   ];
 }
