@@ -57,7 +57,7 @@ export const END_MODE_INFO: Record<EndMode, EndModeInfo> = {
   },
   'repeat-one': {
     mode: 'repeat-one', label: 'Repeat this one', short: 'Repeat 1',
-    description: 'This item plays again from the start, until you change the mode.',
+    description: 'This item plays again from the start each time it ends.',
     icon: { material: 'repeat_one', lucide: 'repeat-1' },
   },
   next: {
@@ -149,8 +149,10 @@ export function createEndPolicy({ random = Math.random }: EndPolicyOptions = {})
     take(mode, ids, current) {
       const d = decide(mode, ids, current);
       if (mode === 'shuffle') {
+        // A new round: everything is fresh again, the item that just ended included (it only may not
+        // start the round, which `others` already ensures).
         if (d.kind === 'play' && d.wrapped) played = new Set();
-        played.add(current);
+        else played.add(current);
       }
       picked = null;
       return d;

@@ -57,6 +57,26 @@ describe('end modes', () => {
     }
   });
 
+  it('every round of a shuffle plays each item exactly once', () => {
+    const p = createEndPolicy({ random: seeded(5) });
+    let current = 'a';
+    const seq = [current];
+    for (let n = 0; n < ids.length * 6 - 1; n++) current = (p.take('shuffle', ids, current) as { id: string }).id, seq.push(current);
+    // Rounds are found from the wraps: split where a take said `wrapped`.
+    const q = createEndPolicy({ random: seeded(5) });
+    let cur = 'a';
+    let round = [cur];
+    const rounds: string[][] = [];
+    for (let n = 0; n < ids.length * 6 - 1; n++) {
+      const d = q.take('shuffle', ids, cur) as { id: string; wrapped: boolean };
+      if (d.wrapped) { rounds.push(round); round = []; }
+      cur = d.id; round.push(cur);
+    }
+    expect(rounds.length).toBeGreaterThanOrEqual(4);
+    for (const r of rounds) expect([...r].sort()).toEqual(ids);
+    expect(seq.length).toBe(ids.length * 6);
+  });
+
   it('a shuffle round starts over (wrapped) only once the set is used up', () => {
     const p = createEndPolicy({ random: seeded(3) });
     const two = ['a', 'b'];
@@ -93,7 +113,10 @@ describe('end modes', () => {
   it('end.setMode and end.cycle read and write the host-owned mode', async () => {
     let mode: EndMode = 'next';
     const r = createRegistry();
-    r.registerAll(endModeCommands({ get: () => mode, set: (m) => { mode = m; } }));
+    let skips = 0;
+    r.registerAll(endModeCommands({ get: () => mode, set: (m) => { mode = m; }, playNext: () => (skips += 1) < 2 }));
+    expect((await r.dispatch('end.playNext') as { ok: boolean }).ok).toBe(true);
+    expect((await r.dispatch('end.playNext') as { ok: boolean }).ok).toBe(false);
     await r.dispatch('end.setMode', { mode: 'shuffle' });
     expect(mode).toBe('shuffle');
     await r.dispatch('end.cycle');

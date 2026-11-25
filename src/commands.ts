@@ -81,9 +81,19 @@ export function sleepCommands(timer: SleepTimer): AnyCommandRecord[] {
  * The end-of-item mode's actions as acture commands (`./end-mode`). The host owns where the mode
  * lives (a persisted preference); these read and write it through `get` and `set`.
  */
-export function endModeCommands({ get, set }: { get: () => EndMode; set: (mode: EndMode) => void }): AnyCommandRecord[] {
+export function endModeCommands({ get, set, playNext }: {
+  get: () => EndMode;
+  set: (mode: EndMode) => void;
+  /** Play now what the mode would play next; false when nothing would. Registers `end.playNext` (a lock screen's next track). */
+  playNext?: () => boolean;
+}): AnyCommandRecord[] {
   const cat = 'media';
+  const next = playNext
+    ? [defineCommand({ id: 'end.playNext', title: 'Play now what would play next', category: cat,
+        execute: () => (playNext() ? ok(undefined) : err('nothing-next', 'Nothing plays next in this mode.')) })]
+    : [];
   return [
+    ...next,
     defineCommand({ id: 'end.setMode', title: 'When an item ends: stop, repeat it, play the list in order, repeat the list or shuffle it', category: cat,
       params: z.object({ mode: z.enum(END_MODES) }),
       execute: (p: { mode: EndMode }) => { set(p.mode); return ok(END_MODE_INFO[p.mode].label); } }),
