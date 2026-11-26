@@ -7,10 +7,11 @@
  * - `./follow`: keep the current line in view until a person scrolls, scrolling one container.
  * - `./timed-text`: a timed text over a media port: current cue and word, tap a line.
  * - `./sleep`: a sleep timer: pause after listening minutes or at a point, with a fade.
+ * - `./end-mode`: what plays when an item ends (stop, repeat one, in order, repeat all, shuffle).
  * - `./transport`: a headless player with a queue over any `MediaPort`.
  * - `./commands`: the transport's and the sleep timer's actions as acture commands (needs `acture` and `zod`).
  *
- * The root re-exports the pure parts (cues, vtt, playback, follow, timed text, sleep): no zustand, acture or
+ * The root re-exports the pure parts (cues, vtt, playback, follow, timed text, sleep, end mode): no zustand, acture or
  * zod. Import the transport and the commands from their subpaths.
  */
 export * from './cues.js';
@@ -19,3 +20,4 @@ export * from './playback.js';
 export * from './follow.js';
 export * from './timed-text.js';
 export * from './sleep.js';
+export * from './end-mode.js';

@@ -1,6 +1,6 @@
 {
   "name": "@zodal/media",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Headless audio and media UI affordances for zodal: timed text (transcripts, lyrics, subtitles) that follows the voice, a safe seek-and-play, a transport with a queue, and its commands.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -75,6 +75,16 @@
       "require": {
         "types": "./dist/sleep.d.cts",
         "default": "./dist/sleep.cjs"
+      }
+    },
+    "./end-mode": {
+      "import": {
+        "types": "./dist/end-mode.d.ts",
+        "default": "./dist/end-mode.js"
+      },
+      "require": {
+        "types": "./dist/end-mode.d.cts",
+        "default": "./dist/end-mode.cjs"
       }
     },
     "./transport": {

@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { defineCommand, ok, err, type AnyCommandRecord } from 'acture';
 import type { MediaItem, MediaPlayer } from './transport.js';
 import type { SleepTimer } from './sleep.js';
+import { END_MODES, END_MODE_INFO, nextEndMode, type EndMode } from './end-mode.js';
 
 /** Commands that carry a target value and are safe at 60 Hz; history and undo should skip them. */
 export const CONTINUOUS_COMMAND_IDS = ['media.seekTo', 'media.setRate', 'media.setVolume'] as const;
@@ -73,5 +74,41 @@ export function sleepCommands(timer: SleepTimer): AnyCommandRecord[] {
       execute: (p: { minutes: number }) => { timer.extend(p.minutes); return done(); } }),
     defineCommand({ id: 'sleep.cancel', title: 'Turn the sleep timer off', category: cat,
       execute: () => { timer.cancel(); return done(); } }),
+  ];
+}
+
+/**
+ * The end-of-item mode's actions as acture commands (`./end-mode`). The host owns where the mode
+ * lives (a persisted preference); these read and write it through `get` and `set`.
+ */
+export function endModeCommands({ get, set, playNext, skip, back }: {
+  get: () => EndMode;
+  set: (mode: EndMode) => void;
+  /** Play now what the mode would play next; false when nothing would. Registers `end.playNext` (an "Up next" button). */
+  playNext?: () => boolean;
+  /** The Next button (`EndPolicy.skip`); false when nothing is next. Registers `end.skip` (▶|, a lock screen's next track). */
+  skip?: () => boolean;
+  /** The Previous button (`EndPolicy.back`): restart, or the item before. Registers `end.back` (|◀, a lock screen's previous track). */
+  back?: () => void;
+}): AnyCommandRecord[] {
+  const cat = 'media';
+  const next = playNext
+    ? [defineCommand({ id: 'end.playNext', title: 'Play now what would play next', category: cat,
+        execute: () => (playNext() ? ok(undefined) : err('nothing-next', 'Nothing plays next in this mode.')) })]
+    : [];
+  const buttons = [
+    ...(skip ? [defineCommand({ id: 'end.skip', title: 'Next item', category: cat,
+      execute: () => (skip() ? ok(undefined) : err('nothing-next', 'Nothing comes next.')) })] : []),
+    ...(back ? [defineCommand({ id: 'end.back', title: 'Previous item (or the start of this one)', category: cat,
+      execute: () => { back(); return ok(undefined); } })] : []),
+  ];
+  return [
+    ...next,
+    ...buttons,
+    defineCommand({ id: 'end.setMode', title: 'When an item ends: stop, repeat it, play the list in order, repeat the list or shuffle it', category: cat,
+      params: z.object({ mode: z.enum(END_MODES) }),
+      execute: (p: { mode: EndMode }) => { set(p.mode); return ok(END_MODE_INFO[p.mode].label); } }),
+    defineCommand({ id: 'end.cycle', title: 'Step to the next end-of-item mode', category: cat,
+      execute: () => { const mode = nextEndMode(get()); set(mode); return ok(END_MODE_INFO[mode].label); } }),
   ];
 }

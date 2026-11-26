@@ -42,6 +42,7 @@ A transcript plays from a tapped line (the default). A lyrics panel whose player
 | `./follow` | `createFollow` (headless: following, finger-down hold, optional auto-resume) and `attachFollow` (one scroll container, never `scrollIntoView`). |
 | `./timed-text` | `createTimedText(cues, port, options)`: the current cue and word, `tapCue`, `cancelHeldPlay`. |
 | `./sleep` | `createSleepTimer(port)`: pause after listening minutes, at a media time or at the end, with a fade; `formatCountdown`, `SLEEP_MINUTES`. |
+| `./end-mode` | `createEndPolicy()`: what plays when an item ends (stop, repeat one, in order, repeat all, shuffle) over the set playback started from; `END_MODE_INFO` holds the words and standard icons. |
 | `./transport` | `createMediaPlayer(port)`: a zustand store with play, pause, seek, skip, rate, volume and a queue, over any `MediaPort`. |
 | `./commands` | `mediaCommands(player)`: the transport's actions as [acture](https://www.npmjs.com/package/acture) commands, continuous ones marked. |
 
@@ -60,6 +61,26 @@ sleep.subscribe((s) => chip.textContent = s.remainingMs == null ? 'Sleep' : form
 ```
 
 It fades the volume over the last 10 s (`fadeMs`) and restores it after the pause, a cancel or an `extend(minutes)`. A seek past an `at` point ends the timer (`ended: 'passed'`) rather than pausing at once. `sleepCommands(timer)` in `./commands` gives `sleep.after`, `sleep.at`, `sleep.end`, `sleep.extend` and `sleep.cancel`.
+
+## When an item ends
+
+```ts
+import { createEndPolicy, END_MODE_INFO, type EndMode } from '@zodal/media';
+
+const policy = createEndPolicy();
+let mode: EndMode = 'next';                         // persist it: a listener's choice survives a reload
+audio.addEventListener('ended', () => {
+  const d = policy.take(mode, listIds, currentId);  // the ids of the list playback started from
+  if (d.kind === 'play') open(d.id);
+  else if (d.kind === 'replay') { audio.currentTime = 0; audio.play(); }
+});
+upNext.textContent = describe(policy.peek(mode, listIds, currentId));   // the same decision, ahead
+chip.textContent = END_MODE_INFO[mode].short;        // always the word beside the icon
+```
+
+One mode instead of a repeat button that cycles plus a shuffle toggle: `stop`, `repeat-one`, `next` (the default: in order, stop after the last), `repeat-all` and `shuffle` (each item once per round, never the one that just ended, endless). `END_MODE_INFO` gives each its label, short word, description and Material Symbols / Lucide icon names. `endModeCommands({ get, set })` in `./commands` gives `end.setMode` and `end.cycle`. The Media Session API has no repeat or shuffle action, so a lock screen cannot show it.
+
+The transport's buttons follow the same set and mode. `policy.skip(mode, ids, current)` is Next (▶|): the next item in order ("Repeat this one" and "Stop after this one" do not trap it), wrapping under "Repeat all", the next of the round under "Shuffle", and `stop` at the end of the list (`peekSkip` tells a host to disable the button). `policy.back(mode, ids, current, position)` is Previous (|◀): it restarts the item past `PREVIOUS_RESTARTS_AFTER_S` (3 s, option `restartAfterS`), else goes to the item before (the one played before under "Shuffle", the last under "Repeat all" from the first), else restarts. `endModeCommands({ …, skip, back })` registers them as `end.skip` and `end.back`, which is what a lock screen's next and previous track should dispatch.
 
 ## The trap it closes: tapping a line after the end
 
