@@ -126,3 +126,62 @@ describe('end modes', () => {
     expect(mode).toBe('stop');
   });
 });
+
+describe('the Next and Previous buttons', () => {
+  it('Next goes on in order; repeat one and stop after this one do not trap it', () => {
+    const p = createEndPolicy();
+    for (const m of ['next', 'stop', 'repeat-one'] as EndMode[]) {
+      expect(p.peekSkip(m, ids, 'b')).toEqual({ kind: 'play', id: 'c', wrapped: false });
+      expect(p.skip(m, ids, 'b')).toEqual({ kind: 'play', id: 'c', wrapped: false });
+      expect(p.skip(m, ids, 'd')).toEqual({ kind: 'stop' }); // the last: nothing next, the host disables ▶|
+    }
+  });
+
+  it('Next at the last item wraps under repeat all and goes on under shuffle', () => {
+    const p = createEndPolicy({ random: seeded() });
+    expect(p.skip('repeat-all', ids, 'd')).toEqual({ kind: 'play', id: 'a', wrapped: true });
+    const d = p.skip('shuffle', ids, 'd');
+    expect(d.kind).toBe('play');
+    expect(d.kind === 'play' && d.id).not.toBe('d');
+  });
+
+  it('Previous restarts past the threshold, else goes to the item before', () => {
+    const p = createEndPolicy();
+    expect(p.back('next', ids, 'c', 42)).toEqual({ kind: 'replay' });
+    expect(p.back('next', ids, 'c', 3.5)).toEqual({ kind: 'replay' });
+    expect(p.back('next', ids, 'c', 1)).toEqual({ kind: 'play', id: 'b', wrapped: false });
+    expect(p.back('repeat-one', ids, 'c', 0)).toEqual({ kind: 'play', id: 'b', wrapped: false });
+    expect(createEndPolicy({ restartAfterS: 10 }).back('next', ids, 'c', 5)).toEqual({ kind: 'play', id: 'b', wrapped: false });
+  });
+
+  it('Previous at the first item restarts it, or wraps to the last under repeat all', () => {
+    const p = createEndPolicy();
+    for (const m of ['stop', 'repeat-one', 'next'] as EndMode[]) expect(p.back(m, ids, 'a', 0)).toEqual({ kind: 'replay' });
+    expect(p.back('repeat-all', ids, 'a', 0)).toEqual({ kind: 'play', id: 'd', wrapped: true });
+    expect(p.back('repeat-all', ['a'], 'a', 0)).toEqual({ kind: 'replay' });
+    expect(p.back('next', ids, 'gone', 0)).toEqual({ kind: 'replay' });
+  });
+
+  it('Previous under shuffle goes back through what was played, then restarts', () => {
+    const p = createEndPolicy({ random: seeded(3) });
+    const first = 'b';
+    const d1 = p.skip('shuffle', ids, first);
+    const second = d1.kind === 'play' ? d1.id : '';
+    const d2 = p.take('shuffle', ids, second);
+    const third = d2.kind === 'play' ? d2.id : '';
+    expect(p.back('shuffle', ids, third, 0)).toEqual({ kind: 'play', id: second, wrapped: false });
+    expect(p.back('shuffle', ids, second, 0)).toEqual({ kind: 'play', id: first, wrapped: false });
+    expect(p.back('shuffle', ids, first, 0)).toEqual({ kind: 'replay' });
+    p.reset();
+    expect(p.back('shuffle', ids, third, 0)).toEqual({ kind: 'replay' });
+  });
+
+  it('registers end.skip and end.back when the host gives them', async () => {
+    const calls: string[] = [];
+    const r = createRegistry();
+    r.registerAll(endModeCommands({ get: () => 'next', set: () => {}, skip: () => { calls.push('skip'); return false; }, back: () => { calls.push('back'); } }));
+    expect((await r.dispatch('end.skip')) as { ok: boolean }).toMatchObject({ ok: false });
+    expect((await r.dispatch('end.back')) as { ok: boolean }).toMatchObject({ ok: true });
+    expect(calls).toEqual(['skip', 'back']);
+  });
+});

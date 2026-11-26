@@ -10,6 +10,8 @@
  *   if (d.kind === 'play') open(d.id); else if (d.kind === 'replay') restart();
  * });
  * policy.peek(mode, setIds, currentId);                  // the same decision, for an "Up next" line
+ * nextButton.onclick = () => act(policy.skip(mode, setIds, currentId));          // ▶|
+ * prevButton.onclick = () => act(policy.back(mode, setIds, currentId, audio.currentTime)); // |◀
  * ```
  *
  * The five modes are the classic players' states folded into one choice (Android's and Apple's
@@ -27,6 +29,16 @@
  *   wraps to the first. A set of one item under "Repeat all" or "Shuffle" replays it.
  * - **An item not in the set** (taken out of the playlist while it played): "In order" stops,
  *   "Repeat all" goes to the set's first item, "Shuffle" picks from the set.
+ *
+ * The transport's buttons follow the same set and mode, as every mainstream player does:
+ * - **Next (▶|)** moves on now. "Repeat this one" and "Stop after this one" are about what happens
+ *   when an item *ends*, so they do not trap the button: it goes to the next item of the list in
+ *   order. Past the last item it wraps under "Repeat all", picks the next of the round under
+ *   "Shuffle", and otherwise does nothing (a host disables the button: `peekSkip` says so).
+ * - **Previous (|◀)** restarts the current item when more than `restartAfterS` (3 s, the CD-player
+ *   rule) has played; otherwise it goes to the item before: the one played before it under
+ *   "Shuffle", the one above it in the list otherwise, wrapping to the last under "Repeat all". With
+ *   nothing before, it restarts.
  */
 
 /** The modes, in the order a menu lists them (stop first, then the loops). */
@@ -93,27 +105,49 @@ export type EndDecision =
   /** Play this item of the set; `wrapped`: the set starts over (repeat all past the end, a new shuffle round). */
   | { kind: 'play'; id: string; wrapped: boolean };
 
+/** How far into an item (seconds) Previous restarts it instead of going to the item before: the CD-player rule. */
+export const PREVIOUS_RESTARTS_AFTER_S = 3;
+
+/**
+ * The mode the Next button follows: the end-of-item mode, except that "Repeat this one" and
+ * "Stop after this one" say what happens at an item's end, not where Next goes, so Next goes on in order.
+ */
+export const skipMode = (mode: EndMode): EndMode => (mode === 'stop' || mode === 'repeat-one' ? 'next' : mode);
+
 export interface EndPolicy {
   /** What `take` would decide now, without moving on (an "Up next" line). Stable until `take` or `reset`. */
   peek(mode: EndMode, ids: readonly string[], current: string): EndDecision;
   /** Decide at the end of `current`, and remember it (the shuffle's round). */
   take(mode: EndMode, ids: readonly string[], current: string): EndDecision;
-  /** Forget the shuffle's round: call when the set changes to another one (a new list was played from). */
+  /** What `skip` would do now (Next, ▶|), without moving on: `stop` means there is nothing next (disable the button). */
+  peekSkip(mode: EndMode, ids: readonly string[], current: string): EndDecision;
+  /** Next (▶|): go on now, in the list's order (see `skipMode`), and remember it like `take`. */
+  skip(mode: EndMode, ids: readonly string[], current: string): EndDecision;
+  /**
+   * Previous (|◀) at `position` seconds into `current`: `replay` (restart it) when past `restartAfterS`
+   * or when nothing comes before, else the item before (`wrapped`: from the first to the last under "Repeat all").
+   */
+  back(mode: EndMode, ids: readonly string[], current: string, position: number): EndDecision;
+  /** Forget the shuffle's round and what was played before: call when the set changes to another one (a new list was played from). */
   reset(): void;
 }
 
 export interface EndPolicyOptions {
   /** A number in [0, 1): `Math.random` by default; a seeded one for tests. */
   random?: () => number;
+  /** Seconds into an item past which Previous restarts it (default `PREVIOUS_RESTARTS_AFTER_S`). */
+  restartAfterS?: number;
 }
 
 const STOP: EndDecision = { kind: 'stop' };
 const REPLAY: EndDecision = { kind: 'replay' };
 
 /** The policy for one player. Every mode but shuffle is a pure function of the set and the current item. */
-export function createEndPolicy({ random = Math.random }: EndPolicyOptions = {}): EndPolicy {
+export function createEndPolicy({ random = Math.random, restartAfterS = PREVIOUS_RESTARTS_AFTER_S }: EndPolicyOptions = {}): EndPolicy {
   /** Items played in this shuffle round. */
   let played = new Set<string>();
+  /** The items moved on from (by `take` or `skip`), latest last: where Previous goes under "Shuffle". */
+  let history: string[] = [];
   /** The shuffle's pick for `after`, kept so `peek` and `take` agree and an "Up next" line does not flicker. */
   let picked: { after: string; id: string; wrapped: boolean } | null = null;
 
@@ -144,19 +178,41 @@ export function createEndPolicy({ random = Math.random }: EndPolicyOptions = {})
     return i + 1 < ids.length ? { kind: 'play', id: ids[i + 1], wrapped: false } : { kind: 'play', id: ids[0], wrapped: true };
   };
 
+  const take = (mode: EndMode, ids: readonly string[], current: string): EndDecision => {
+    const d = decide(mode, ids, current);
+    if (mode === 'shuffle') {
+      // A new round: everything is fresh again, the item that just ended included (it only may not
+      // start the round, which `others` already ensures).
+      if (d.kind === 'play' && d.wrapped) played = new Set();
+      else played.add(current);
+    }
+    if (d.kind === 'play') history.push(current);
+    picked = null;
+    return d;
+  };
+
+  const back = (mode: EndMode, ids: readonly string[], current: string, position: number): EndDecision => {
+    if (position > restartAfterS) return REPLAY;
+    if (mode === 'shuffle') {
+      // Back through what was played, skipping items that left the set (or the current one, met again).
+      while (history.length) {
+        const id = history.pop()!;
+        if (id !== current && ids.includes(id)) { picked = null; return { kind: 'play', id, wrapped: false }; }
+      }
+      return REPLAY;
+    }
+    const i = ids.indexOf(current);
+    if (i > 0) return { kind: 'play', id: ids[i - 1], wrapped: false };
+    if (i === 0 && mode === 'repeat-all' && ids.length > 1) return { kind: 'play', id: ids[ids.length - 1], wrapped: true };
+    return REPLAY;
+  };
+
   return {
     peek: decide,
-    take(mode, ids, current) {
-      const d = decide(mode, ids, current);
-      if (mode === 'shuffle') {
-        // A new round: everything is fresh again, the item that just ended included (it only may not
-        // start the round, which `others` already ensures).
-        if (d.kind === 'play' && d.wrapped) played = new Set();
-        else played.add(current);
-      }
-      picked = null;
-      return d;
-    },
-    reset() { played = new Set(); picked = null; },
+    take,
+    peekSkip: (mode, ids, current) => decide(skipMode(mode), ids, current),
+    skip: (mode, ids, current) => take(skipMode(mode), ids, current),
+    back,
+    reset() { played = new Set(); picked = null; history = []; },
   };
 }
