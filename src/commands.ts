@@ -98,7 +98,7 @@ export function endModeCommands({ get, set, playNext, skip, back }: {
     : [];
   const buttons = [
     ...(skip ? [defineCommand({ id: 'end.skip', title: 'Next item', category: cat,
-      execute: () => (skip() ? ok(undefined) : err('nothing-next', 'This is the last item of the list.')) })] : []),
+      execute: () => (skip() ? ok(undefined) : err('nothing-next', 'Nothing comes next.')) })] : []),
     ...(back ? [defineCommand({ id: 'end.back', title: 'Previous item (or the start of this one)', category: cat,
       execute: () => { back(); return ok(undefined); } })] : []),
   ];

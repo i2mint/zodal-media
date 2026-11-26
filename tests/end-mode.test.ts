@@ -185,3 +185,37 @@ describe('the Next and Previous buttons', () => {
     expect(calls).toEqual(['skip', 'back']);
   });
 });
+
+describe('Previous and Next under shuffle, back and forth', () => {
+  it('Next after Previous returns to the item left, before any new pick', () => {
+    const p = createEndPolicy({ random: seeded(5) });
+    const d = p.skip('shuffle', ids, 'a');
+    const y = d.kind === 'play' ? d.id : '';
+    expect(p.back('shuffle', ids, y, 0)).toEqual({ kind: 'play', id: 'a', wrapped: false });
+    expect(p.peekSkip('shuffle', ids, 'a')).toEqual({ kind: 'play', id: y, wrapped: false });
+    expect(p.skip('shuffle', ids, 'a')).toEqual({ kind: 'play', id: y, wrapped: false });
+    // and the end of an item follows the same road
+    p.back('shuffle', ids, y, 0);
+    expect(p.take('shuffle', ids, 'a')).toEqual({ kind: 'play', id: y, wrapped: false });
+  });
+
+  it('an item the host opened itself is where Previous comes back to, and counts as played', () => {
+    const p = createEndPolicy({ random: seeded(9) });
+    const d = p.skip('shuffle', ids, 'a');
+    const b = d.kind === 'play' ? d.id : '';
+    p.opened('a', b); // the host carrying out the policy's move: not counted twice
+    const e = ids.find((x) => x !== 'a' && x !== b)!;
+    p.opened(b, e); // a row tapped
+    expect(p.back('shuffle', ids, e, 0)).toEqual({ kind: 'play', id: b, wrapped: false });
+    p.opened(e, b);
+    expect(p.back('shuffle', ids, b, 0)).toEqual({ kind: 'play', id: 'a', wrapped: false });
+  });
+
+  it('leaving shuffle forgets its back and forth; Repeat all goes round backwards from an unknown item', () => {
+    const p = createEndPolicy({ random: seeded(2) });
+    p.skip('shuffle', ids, 'a');
+    p.take('next', ids, 'b');
+    expect(p.back('shuffle', ids, 'c', 0)).toEqual({ kind: 'replay' });
+    expect(p.back('repeat-all', ids, 'gone', 0)).toEqual({ kind: 'play', id: 'd', wrapped: false });
+  });
+});
